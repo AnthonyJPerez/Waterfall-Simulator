@@ -15,7 +15,7 @@
  */
 import type { AudioModule, FrameContext, ModuleContext } from '../app/modules';
 import { ReadbackRing } from '../gpu/util';
-import { IMPACT_EVENT_BYTES, MAX_IMPACT_EVENTS, SIM_EVENTS_BYTES, SIM_EVENTS_HEADER_BYTES, SWE_STATS_BYTES } from '../world/wgsl';
+import { IMPACT_EVENT_BYTES, MAX_IMPACT_EVENTS, SIM_EVENTS_BYTES, SIM_EVENTS_HEADER_BYTES, STAT_TILES_X, STAT_TILES_Z, SWE_STATS_BYTES } from '../world/wgsl';
 import { AudioMapper, type ListenerPose, type MapperDiagnostics } from './mapping';
 import { LAYOUT, NUM_EMITTERS, OUT_AMBIENCE, OUT_REVERB, PROCESSOR_NAME, type FrameMessage, type WorkletStats } from './protocol';
 import { parseSimEvents, parseSweStats, type ParsedEvents, type ParsedStats } from './readback';
@@ -87,6 +87,8 @@ export class WaterAudioEngine implements AudioModule {
   constructor(private ctx: ModuleContext) {
     this.mapper = new AudioMapper(NUM_EMITTERS, 0x5eed);
     this.mapper.defaultEventVolume = ctx.world.particleVolume;
+    const d = ctx.world.domain;
+    this.mapper.maxTileArea = ((d.sizeX * d.sizeZ) / (STAT_TILES_X * STAT_TILES_Z)) * 1.25;
   }
 
   get running(): boolean {

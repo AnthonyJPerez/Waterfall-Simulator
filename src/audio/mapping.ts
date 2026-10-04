@@ -6,18 +6,49 @@
  * worklet, plus per-emitter continuous-layer parameters (rumble / rush / hiss levels and spectra,
  * distance gain, air absorption, reverb send).
  *
- * Mapping summary (see docs/AUDIO.md for the full description and the assumptions made about the producers):
- *  - Impacts are binned on a 6 cm grid; the volume flux of each bin decides how much of it behaves as
- *    discrete drops (sparse) vs. a plunging jet / sheet (dense). Sparse IMPACT_POOL / IMPACT_DROP → impact
- *    transient + bubble with the drop-entrainment probability (Pumphrey & Elmore) and a size-dependent
- *    radius; sparse IMPACT_SOLID → splatter noise bursts; dense IMPACT_POOL → plunging-jet bubble cloud
- *    (air entrainment ratio β(v), Garrett–Li–Farmer size spectrum), low rumble and splash hiss.
- *  - SWE tiles → stream babble (Poisson bubbles, rate ∝ turbulence × area × speed, radii 1–8 mm shaped by
- *    depth and speed), hydraulic-jump gurgles, and a subtle broadband "rush".
- *  - Populations too dense to synthesise individually are split by bubble size: the largest (most
- *    distinct) bubbles are synthesised, the rest is rendered as band-limited noise of the same power
+ * ── What the producers are expected to deliver (contract in src/world/wgsl.ts) ─────────────────────────
+ *  SimEvents (particles): ONE event per impact of a falling-water particle (or droplet), written in the
+ *    step in which it happens; the list is cleared at the start of every particle step (an identical list
+ *    two frames in a row is treated as stale). velVol.xyz = velocity at impact (m/s), velVol.w = water
+ *    volume the event represents (m³) — summed over a second this must equal the falling volume flux
+ *    (e.g. 3 L/s → 3e-3 m³ of IMPACT_POOL+IMPACT_SOLID volume per simulated second). Missing/invalid
+ *    volumes fall back to world.particleVolume; volumes are clamped to MAX_EVENT_VOLUME (20 mL).
+ *    kind: 0 IMPACT_POOL entering water, 1 IMPACT_SOLID striking rock/dry bed, 2 IMPACT_DROP small spray
+ *    droplet re-entering water (if the producer never emits kind 2, secondary splash droplets are
+ *    synthesised here instead). Overflowing lists: droppedCount / droppedVolume (or count > MAX) are added
+ *    to the dense (jet) part of the recorded bins in proportion to their volume.
+ *  SweStats (SWE): per 16×8 tile: centroid xyz (where the activity is), w = wetted area m² (clamped to the
+ *    tile's real area), flow = (mean speed m/s, turbulence / entrainment intensity ≈ 0..1 where 1 means
+ *    fully broken white water (clamped at 3), hydraulic-jump intensity ≈ 0..1 (clamped at 3), mean depth m).
+ *    Impacts of falling water are covered by SimEvents, so ideally the tile turbulence reflects the
+ *    stream's own surface breaking (riffles, rapids, jumps), not deposit-driven aeration.
+ *
+ * ── Mapping ──────────────────────────────────────────────────────────────────────────────────────────
+ *  Impacts are binned on a 6 cm grid; the smoothed volume flux q of each bin (τ = 0.15 s) sets the dense
+ *  fraction w = smoothstep(0.02, 0.15 L/s, q): each event is dense with probability w.
+ *  Sparse IMPACT_POOL / IMPACT_DROP (drop of diameter D = (6V/π)^⅓, ≤ 6.5 mm (breakup), ≤ 4 mm for drops):
+ *    · impact transient: band-limited noise click, amp = 0.035·(D/5mm)^0.8·(v/2.5)^1.5, fc ≈ 4.5 kHz·√(5mm/D)
+ *    · with probability P(D, v) (regular-entrainment window + large-drop crater collapse, physics.ts) a
+ *      bubble r = D·[0.12..0.30] (log-uniform), f0 = 3.26/r, d = 0.043 f0 + 0.0014 f0^1.5, chirp ξ ∈
+ *      [0.08, 0.2], amp = 0.15·ε·(r/1mm)^1.2, delayed by the crater collapse time 2 ms + 3.5 ms/mm·D
+ *    · secondary crown droplets (only if no IMPACT_DROP events arrive): Poisson(0.4·smoothstep(1.5,4,v)),
+ *      D2 ∈ [0.6, 1.6] mm, 40–160 ms later → high 10–20 kHz plinks.
+ *  Sparse IMPACT_SOLID → 1–3 splatter bursts (1.5–7 kHz, 0.7–2 ms), amp = 0.05·(D/5mm)^0.8·(v/2.5)^1.5.
+ *  Dense IMPACT_POOL per emitter (flux Q, mean speed v): air entrainment β(v) = 0.06·((v−0.9)/2)^1.3 →
+ *    bubble rate λ = β·Q / V̄ (V̄ ≈ 3e-9 m³, GLF spectrum r ∈ [0.1, 6] mm, Hinze 1 mm), amp = 0.02·ε·(r/1mm)^1.2;
+ *    rumble rms = 0.015·√(½ρQv²)·smoothstep(0.8, 2, v) at f ≈ 30 Hz·m / plume size (55–240 Hz);
+ *    splash hiss rms = 0.012·√(½ρQv²·v/3) (2.2 kHz high-pass).
+ *  Dense IMPACT_SOLID / IMPACT_DROP → hiss of the same mean power as the bursts / plinks they replace.
+ *  SWE tile → babble λ = 15000·T·A·u bubbles/s, r ∝ r^-2.2 on [max(0.5, 0.9/(1+0.4u)) mm, clamp(0.4h, 1.5, 8) mm],
+ *    amp = 0.015·(0.5+0.5·min(1, u/1.2))·ε·(r/1mm)^1.2; jumps: 400·J·A gurgles/s, r 3–10 mm, ξ 0.2–0.45;
+ *    rush rms² = 0.05²·A·u³·(0.3+T) band-pass at 300 + 500·u Hz.
+ *  Budget: ≤ 2400 individual bubbles/s and ≤ 1400 bursts/s (≈ 60 % reserved for discrete drops, chosen
+ *    by perceived amplitude so near-field drips always survive). Denser populations are split by size:
+ *    the largest bubbles are synthesised, the rest becomes band-limited noise of equal power
  *    (incoherent Poisson sum: power = λ·A²/4d), so loudness scales continuously with flow.
- *  - All sources are clustered into spatial emitters (cluster.ts).
+ *  Slow motion: frequencies, dampings and chirps × p = √timeScale; event rates follow the sim naturally.
+ *  Distance: gain = 0.5 m / √(d² + (ext/2)² + 0.07²) (≤ 2.5), air low-pass 20 kHz·√(0.6/d) (≥ 2.5 kHz),
+ *  reverb send 0.55·√min(gain, 1). All sources are clustered into spatial emitters (cluster.ts).
  */
 import { EmitterClusterer, type ClusterPoint } from './cluster';
 import {
@@ -46,6 +77,9 @@ export const IMPACT_SOLID = 1;
 export const IMPACT_DROP = 2;
 
 export const BUBBLE_KIND = { drop: 0, secondary: 1, jet: 2, babble: 3, jump: 4 } as const;
+
+/** Largest plausible volume represented by one impact event (m³) — guards against unit mistakes upstream. */
+export const MAX_EVENT_VOLUME = 2e-5;
 
 /** Calibration constants (output units: 1.0 = full scale for a source at `refDistance`). */
 export const TUNING = {
@@ -242,6 +276,8 @@ export class AudioMapper {
   defaultEventVolume = 2.16e-7;
   /** Output sample rate (Nyquist guard). */
   sampleRate = 48000;
+  /** Upper bound for a stat tile's wetted area (m²); the engine sets the real tile area (+ margin). */
+  maxTileArea = 10;
 
   private jetDist: PiecewisePowerLaw;
   private jetMeanVol: number;
@@ -583,7 +619,7 @@ export class AudioMapper {
       }
       let vol = d[o + 7];
       if (!(vol > 0) || !Number.isFinite(vol)) vol = this.defaultEventVolume;
-      vol = Math.min(vol, 1e-3);
+      vol = Math.min(vol, MAX_EVENT_VOLUME);
       const sp = Math.min(Math.hypot(fin(d[o + 4]), fin(d[o + 5]), fin(d[o + 6])), 30);
       const key = (Math.floor(x * inv) + 2048) * 16777216 + (Math.floor(y * inv) + 2048) * 4096 + (Math.floor(z * inv) + 2048);
       let bi = this.binIndex.get(key);
@@ -692,7 +728,7 @@ export class AudioMapper {
     const a2 = 2 * T.alpha;
     for (let t = 0; t < NUM_TILES; t++) {
       const o = t * TILE_FLOATS;
-      const area = clamp(fin(tl[o + 3]), 0, 10);
+      const area = clamp(fin(tl[o + 3]), 0, this.maxTileArea);
       const u = clamp(fin(tl[o + 4]), 0, 6);
       const turb = clamp(fin(tl[o + 5]), 0, 3);
       const jump = clamp(fin(tl[o + 6]), 0, 3);
@@ -747,7 +783,7 @@ export class AudioMapper {
         const kind = Math.round(d[o + 3]);
         let vol = d[o + 7];
         if (!(vol > 0) || !Number.isFinite(vol)) vol = this.defaultEventVolume;
-        vol = Math.min(vol, 1e-3);
+        vol = Math.min(vol, MAX_EVENT_VOLUME);
         const v = Math.min(Math.hypot(fin(d[o + 4]), fin(d[o + 5]), fin(d[o + 6])), 30);
         if (kind === IMPACT_DROP) dropN++;
         if (this.rand() < bin.wDense[kind]) {
