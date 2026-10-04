@@ -171,6 +171,7 @@ export class ObstacleEditor implements EditorModule {
   private lastStatus = '';
   private unsubs: (() => unknown)[] = [];
   private destroyed = false;
+  private orbitBounds: OrbitController['bounds'] = null;
 
   constructor(
     private ctx: ModuleContext,
@@ -208,7 +209,7 @@ export class ObstacleEditor implements EditorModule {
     // Camera helpers through the OrbitController contract.
     orbit.ground = this.orbitGround;
     orbit.pick = this.orbitPick;
-    orbit.bounds = {
+    orbit.bounds = this.orbitBounds = {
       min: [-0.25 * d.sizeX, d.minY - 0.2, -0.25 * d.sizeZ],
       max: [1.25 * d.sizeX, d.maxY + 0.6, 1.25 * d.sizeZ],
     };
@@ -1056,7 +1057,23 @@ export class ObstacleEditor implements EditorModule {
     this.xformThrottle.tick();
     this.buildOverlay();
     this.updateLabel();
+    this.updateCursor();
     this.emitStatus();
+  }
+
+  private lastCursor = '';
+
+  private updateCursor() {
+    const tool = this.tool;
+    let c = 'grab';
+    if (this.drag) c = this.drag.mode === 'lift' ? 'ns-resize' : 'grabbing';
+    else if (tool === 'add') c = this.ghost?.valid ? 'crosshair' : 'not-allowed';
+    else if (tool === 'move' && this.hoverId !== null) c = this.pointer?.shift || this.pointer?.alt ? 'ns-resize' : 'move';
+    else if (tool === 'delete' && this.hoverId !== null) c = 'pointer';
+    if (c !== this.lastCursor) {
+      this.lastCursor = c;
+      this.canvas.style.cursor = c;
+    }
   }
 
   drawOverlay(encoder: GPUCommandEncoder, frame: FrameContext, target: GPUTextureView) {
@@ -1357,8 +1374,10 @@ export class ObstacleEditor implements EditorModule {
     this.history.dispose();
     if (this.orbit.ground === this.orbitGround) this.orbit.ground = null;
     if (this.orbit.pick === this.orbitPick) this.orbit.pick = null;
+    if (this.orbit.bounds === this.orbitBounds) this.orbit.bounds = null;
     this.label?.remove();
     this.label = null;
+    this.canvas.style.cursor = '';
     this.overlay.destroy();
   }
 }

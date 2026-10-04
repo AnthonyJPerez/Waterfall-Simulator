@@ -60,6 +60,33 @@
       .wf-stats { position: fixed; left: 10px; top: 56px; margin: 0; z-index: 2; padding: 6px 9px; background: var(--wf-glass); border: 1px solid var(--wf-line); border-radius: 8px; font: 11px/1.45 ui-monospace, monospace; color: var(--wf-dim); pointer-events: none; white-space: pre; }
       .wf-stats[hidden] { display: none; }
 
+      /* Control panel theme (Tweakpane v4 custom properties) */
+      #ui {
+        --tp-base-background-color: hsla(165, 12%, 8%, 0.84);
+        --tp-base-shadow-color: rgba(0, 0, 0, 0.3);
+        --tp-base-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --tp-button-background-color: hsla(166, 45%, 72%, 0.16);
+        --tp-button-background-color-active: hsla(166, 50%, 76%, 0.34);
+        --tp-button-background-color-focus: hsla(166, 50%, 76%, 0.27);
+        --tp-button-background-color-hover: hsla(166, 50%, 76%, 0.23);
+        --tp-button-foreground-color: #dcf6ee;
+        --tp-container-background-color: hsla(160, 10%, 80%, 0.07);
+        --tp-container-background-color-active: hsla(160, 10%, 80%, 0.17);
+        --tp-container-background-color-focus: hsla(160, 10%, 80%, 0.13);
+        --tp-container-background-color-hover: hsla(160, 10%, 80%, 0.1);
+        --tp-container-foreground-color: #e3ebe7;
+        --tp-groove-foreground-color: hsla(160, 10%, 80%, 0.1);
+        --tp-input-background-color: hsla(160, 10%, 80%, 0.07);
+        --tp-input-background-color-active: hsla(160, 10%, 80%, 0.17);
+        --tp-input-background-color-focus: hsla(160, 10%, 80%, 0.13);
+        --tp-input-background-color-hover: hsla(160, 10%, 80%, 0.1);
+        --tp-input-foreground-color: #e8f0ec;
+        --tp-label-foreground-color: rgba(223, 231, 227, 0.66);
+        --tp-monitor-background-color: rgba(0, 0, 0, 0.22);
+        --tp-monitor-foreground-color: rgba(178, 236, 219, 0.9);
+      }
+      #ui .tp-rotv { backdrop-filter: blur(8px); border: 1px solid var(--wf-line); }
+
       /* Panel extras */
       .wf-preset-desc { padding: 2px 8px 6px; font-size: 11px; line-height: 1.4; color: rgba(220, 230, 226, .62); }
 
