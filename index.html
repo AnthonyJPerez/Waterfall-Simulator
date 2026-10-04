@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Creekside — Waterfall Simulator</title>
+    <style>
+      html, body { margin: 0; height: 100%; background: #0b0f0e; color: #dfe7e3; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+      #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
+      #ui { position: fixed; top: 10px; right: 10px; width: 300px; max-height: calc(100vh - 20px); overflow-y: auto; z-index: 2; }
+      #hint { position: fixed; left: 12px; bottom: 10px; opacity: 0; transition: opacity 1s; color: #cfd8d4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
+      #hint.show { opacity: 0.85; }
+      #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 2em; z-index: 3; }
+      #error p { max-width: 520px; font-size: 16px; }
+      body.noui #ui, body.noui #hint { display: none; }
+    </style>
+  </head>
+  <body>
+    <canvas id="view"></canvas>
+    <div id="ui"></div>
+    <div id="hint">Drag to orbit · right-drag to pan · wheel to zoom · click anywhere to enable sound</div>
+    <div id="error"><p></p></div>
+    <script>
+      if (new URLSearchParams(location.search).get('noui') === '1') document.body.classList.add('noui');
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
