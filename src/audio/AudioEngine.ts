@@ -317,7 +317,8 @@ export class WaterAudioEngine implements AudioModule {
   private updatePanners(smooth: boolean) {
     const g = this.graph;
     const L = this.listener;
-    if (!g || !L || !this.shared) return;
+    // No automation while the context is suspended (currentTime is frozen: events would pile up).
+    if (!g || !L || !this.shared || !this.shared.audible) return;
     const now = this.shared.ctx.currentTime;
     const em = this.mapper.clusterer.emitters;
     for (let e = 0; e < g.panners.length; e++) {

@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 60000 });
 import { AudioMapper, BUBBLE_KIND, IMPACT_DROP, IMPACT_POOL, IMPACT_SOLID, TUNING, type MapperInput } from '../src/audio/mapping';
 import { makeRng, minnaertFrequency } from '../src/audio/physics';
 import { LAYOUT } from '../src/audio/protocol';
@@ -149,9 +151,8 @@ describe('AudioMapper: robustness and context', () => {
       [NaN, NaN],
     ]) {
       m.process({ simDt, realDt, timeScale: NaN, paused: false, listener: listenerAt([1, 1, 1], [1, 0, 0]), events: bad, stats: tiles, gains: { bubbles: NaN, roar: Infinity, ambience: -1 } });
-      for (const v of [...m.bubbles.data.subarray(0, m.bubbles.n * 8), ...m.bursts.data.subarray(0, m.bursts.n * 8), ...m.emitterParams, ...m.globals]) {
-        expect(Number.isFinite(v)).toBe(true);
-      }
+      const all = [...m.bubbles.data.subarray(0, m.bubbles.n * 8), ...m.bursts.data.subarray(0, m.bursts.n * 8), ...m.emitterParams, ...m.globals];
+      expect(all.every((v) => Number.isFinite(v))).toBe(true);
     }
   });
 

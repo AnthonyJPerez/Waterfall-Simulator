@@ -92,6 +92,7 @@ export function defineSynth() {
   }
 
   const clamp = (x: number, a: number, b: number) => (x < a ? a : x > b ? b : x);
+  const ftz = (x: number) => (x > 1e-25 || x < -1e-25 ? x : 0);
   const finite = (x: number) => x === x && x !== Infinity && x !== -Infinity;
 
   /** Topology-preserving-transform state-variable filter coefficients (Zavalishin / Simper). */
@@ -806,15 +807,16 @@ export function defineSynth() {
           this.st.nanResets++;
           if (out) out.fill(0, 0, n);
         } else {
-          st[s] = rs1;
-          st[s + 1] = rs2;
-          st[s + 2] = rlp;
-          st[s + 3] = ms1;
-          st[s + 4] = ms2;
-          st[s + 5] = hs1;
-          st[s + 6] = hs2;
-          st[s + 7] = hb;
-          st[s + 8] = air;
+          // Flush-to-zero: decaying filter states must not drift into (slow) denormals during silence.
+          st[s] = ftz(rs1);
+          st[s + 1] = ftz(rs2);
+          st[s + 2] = ftz(rlp);
+          st[s + 3] = ftz(ms1);
+          st[s + 4] = ftz(ms2);
+          st[s + 5] = ftz(hs1);
+          st[s + 6] = ftz(hs2);
+          st[s + 7] = ftz(hb);
+          st[s + 8] = ftz(air);
         }
       }
       for (let e = E; e < outs.length; e++) {
@@ -980,19 +982,19 @@ export function defineSynth() {
         st.fill(0, 0, 10);
         envL = envR = 0;
       } else {
-        st[0] = l1;
-        st[1] = l2;
-        st[2] = q1;
-        st[3] = q2;
-        st[4] = w1;
-        st[5] = w2;
-        st[6] = o1;
-        st[7] = o2;
-        st[8] = w1r;
-        st[9] = w2r;
+        st[0] = ftz(l1);
+        st[1] = ftz(l2);
+        st[2] = ftz(q1);
+        st[3] = ftz(q2);
+        st[4] = ftz(w1);
+        st[5] = ftz(w2);
+        st[6] = ftz(o1);
+        st[7] = ftz(o2);
+        st[8] = ftz(w1r);
+        st[9] = ftz(w2r);
       }
-      this.envL = envL;
-      this.envR = envR;
+      this.envL = ftz(envL);
+      this.envR = ftz(envR);
       this.renderBirds(ambL, ambR, n, level);
     }
 
@@ -1068,7 +1070,7 @@ export function defineSynth() {
         this.birdT[b] = t;
         this.birdPh[b] = ph;
         this.birdMph[b] = mph;
-        this.birdLp[b] = lp;
+        this.birdLp[b] = ftz(lp);
         const endT = nn > 0 ? notes[(nn - 1) * NOTE] + notes[(nn - 1) * NOTE + 1] + 0.05 : 0;
         if (t > endT || !(lp === lp)) this.birdOn[b] = 0;
       }

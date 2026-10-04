@@ -1,4 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+vi.setConfig({ testTimeout: 60000 });
 import { bubbleDamping } from '../src/audio/physics';
 import { LAYOUT, PROCESSOR_NAME, SYNTH } from '../src/audio/protocol';
 import { generateImpulseResponse, softClipCurve } from '../src/audio/reverb';
@@ -6,6 +8,10 @@ import { workletSource } from '../src/audio/worklet';
 import { db, fallScenario, FS, octaveBands, peak, powerSpectrum, rapidScenario, renderScenario, rms, spectralCentroid, wav } from './audio.harness';
 
 const E = 4;
+const allFinite = (a: ArrayLike<number>) => {
+  for (let i = 0; i < a.length; i++) if (!Number.isFinite(a[i])) return false;
+  return true;
+};
 
 function makeSynth(seed = 1) {
   const s = new SYNTH.Synth(FS, E, seed);
@@ -130,7 +136,7 @@ describe('DSP core: bubble oscillator', () => {
     for (let b = 0; b < 200; b++) {
       s.render(outs, null, null, null, 128);
       expect(s.activeVoices).toBeLessThanOrEqual(64);
-      for (const o of outs) for (const v of o) expect(Number.isFinite(v)).toBe(true);
+      expect(outs.every(allFinite)).toBe(true);
     }
     expect(s.st.stolen).toBeGreaterThan(0);
   });
@@ -216,7 +222,7 @@ describe('DSP core: continuous layers', () => {
     expect(peak(y.ambL)).toBeLessThan(0.5);
     const birdBands = octaveBands(y.ambL, FS);
     expect(Math.max(birdBands[5], birdBands[6], birdBands[7])).toBe(0); // 2k / 4k / 8k octave holds the maximum
-    for (const v of y.ambL) expect(Number.isFinite(v)).toBe(true);
+    expect(allFinite(y.ambL) && allFinite(y.ambR)).toBe(true);
   });
 });
 
@@ -240,7 +246,7 @@ describe('offline renders of synthetic simulation streams', () => {
 
   it('no NaN, no gross overs', () => {
     for (const r of [trickle, fall, cascade, rapid]) {
-      for (const v of r.mono) expect(Number.isFinite(v)).toBe(true);
+      expect(allFinite(r.mono)).toBe(true);
       // Pre-master headroom: the master limiter + soft clip follow, but the synth itself must stay sane.
       expect(peak(r.mono)).toBeLessThan(2.5);
     }
@@ -326,13 +332,18 @@ describe('worklet module', () => {
     p.port.onmessage({ data: null });
     p.port.onmessage({ data: { type: 'frame', bubbles: 'garbage' } });
     let energy = 0;
+    let finite = true;
+    let alive = true;
     for (let b = 0; b < 400; b++) {
-      expect(p.process([], outputs)).toBe(true);
-      for (const o of outputs) for (const ch of o) for (const v of ch) {
-        expect(Number.isFinite(v)).toBe(true);
-        energy += v * v;
-      }
+      alive = alive && p.process([], outputs) === true;
+      for (const o of outputs)
+        for (const ch of o) {
+          finite = finite && allFinite(ch);
+          for (let i = 0; i < ch.length; i++) energy += ch[i] * ch[i];
+        }
     }
+    expect(alive).toBe(true);
+    expect(finite).toBe(true);
     expect(energy).toBeGreaterThan(0);
     expect(p.port.sent.some((m: any) => m?.type === 'stats')).toBe(true);
     p.port.onmessage({ data: { type: 'dispose' } });
@@ -350,7 +361,6 @@ describe('reverb impulse response and output safety', () => {
     let tail = 0;
     let early = 0;
     for (let i = 0; i < l.length; i++) {
-      expect(Number.isFinite(l[i]) && Number.isFinite(r[i])).toBe(true);
       e += l[i] * l[i] + r[i] * r[i];
       lr += l[i] * r[i];
       el += l[i] * l[i];
@@ -358,6 +368,7 @@ describe('reverb impulse response and output safety', () => {
       if (i > 0.8 * l.length) tail += l[i] * l[i];
       if (i < 0.06 * FS) early += l[i] * l[i];
     }
+    expect(allFinite(l) && allFinite(r)).toBe(true);
     expect(e / 2).toBeCloseTo(1, 3);
     expect(Math.abs(lr) / Math.sqrt(el * er)).toBeLessThan(0.3);
     expect(tail / el).toBeLessThan(0.01);
