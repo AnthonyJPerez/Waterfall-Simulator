@@ -10,7 +10,7 @@ import { StubParticleSim } from '../sim/particles/ParticleSim';
 import { EnvRenderer } from '../render/env/EnvRenderer';
 import { StubWaterRenderer } from '../render/water/WaterRenderer';
 import { StubParticleRenderer } from '../render/particles/ParticleRenderer';
-import { StubAudioEngine } from '../audio/AudioEngine';
+import { WaterAudioEngine } from '../audio/AudioEngine';
 import { StubEditor } from '../editor/Editor';
 
 export interface HostContext {
@@ -26,7 +26,7 @@ export function createModules(ctx: ModuleContext, host: HostContext): Modules {
   const env = new EnvRenderer(ctx.gpu.device, ctx.shared);
   const water = new StubWaterRenderer(ctx);
   const particlesRenderer = new StubParticleRenderer(ctx, particles);
-  const audio = new StubAudioEngine(ctx);
+  const audio = new WaterAudioEngine(ctx);
   const editor = new StubEditor(ctx, host.canvas, host.camera, host.orbit, terrain);
   return { terrain, swe, particles, env, water, particlesRenderer, audio, editor };
 }
