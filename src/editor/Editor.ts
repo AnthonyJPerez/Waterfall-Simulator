@@ -350,9 +350,14 @@ export class ObstacleEditor implements EditorModule {
     } catch {
       /* not focusable */
     }
-    if (this.press || this.drag) {
-      // A second finger / button while editing: keep it away from the orbit controller.
-      if (e.pointerType === 'touch') this.consume(e);
+    if (this.drag) {
+      // Another finger / button while dragging an obstacle: keep the camera still.
+      this.consume(e);
+      return;
+    }
+    if (this.press) {
+      // A second pointer turns the gesture into a camera gesture (pinch / pan): no click.
+      this.press = null;
       return;
     }
     if (e.button !== 0) return;
@@ -479,9 +484,10 @@ export class ObstacleEditor implements EditorModule {
 
   private onKeyDown = (e: KeyboardEvent) => {
     if (this.destroyed || isTypingTarget(e.target)) return;
-    if (this.pointer) {
+    if (this.pointer && (this.pointer.shift !== e.shiftKey || this.pointer.alt !== e.altKey)) {
       this.pointer.shift = e.shiftKey;
       this.pointer.alt = e.altKey;
+      this.dirty = true;
     }
     const mod = e.ctrlKey || e.metaKey;
     const k = e.key;

@@ -207,7 +207,7 @@ export class SceneHistory {
     if (c.type === 'obstacle-added') op = { kind: 'add', id: c.obstacle.id, data: cloneData(c.obstacle) };
     else if (c.type === 'obstacle-removed') op = { kind: 'remove', id: c.obstacle.id, data: cloneData(c.obstacle) };
     else op = { kind: 'update', id: c.obstacle.id, before: cloneData(c.previous), after: cloneData(c.obstacle) };
-    if (!this.open) this.open = { label: autoLabel(op), ops: [], explicit: 0 };
+    if (!this.open) this.open = { label: 'auto', ops: [], explicit: 0 };
     this.open.ops.push(op);
     if (this.open.explicit === 0 && !this.autoScheduled) {
       this.autoScheduled = true;
@@ -231,7 +231,7 @@ export class SceneHistory {
       last.time = t;
       if (!last.ops.length) this.undoStack.pop();
     } else {
-      this.undoStack.push({ label: g.label === 'auto' ? autoLabel(ops[0]) : g.label, ops, coalesceKey: g.coalesceKey, time: t });
+      this.undoStack.push({ label: g.label === 'auto' ? groupLabel(ops) : g.label, ops, coalesceKey: g.coalesceKey, time: t });
       if (this.undoStack.length > this.limit) this.undoStack.splice(0, this.undoStack.length - this.limit);
     }
     this.redoStack = [];
@@ -313,4 +313,17 @@ export class SceneHistory {
 function autoLabel(op: HistoryOp): string {
   const what = op.kind === 'update' ? op.after.kind : op.data.kind;
   return op.kind === 'add' ? `add ${what}` : op.kind === 'remove' ? `delete ${what}` : `move ${what}`;
+}
+
+/** Human-readable summary of an automatic group (shown in undo / redo tooltips). */
+export function groupLabel(ops: readonly HistoryOp[]): string {
+  if (ops.length === 1) return autoLabel(ops[0]);
+  const n = (k: HistoryOp['kind']) => ops.filter((o) => o.kind === k).length;
+  const adds = n('add');
+  const removes = n('remove');
+  const updates = n('update');
+  if (removes && !adds && !updates) return `remove ${removes} obstacles`;
+  if (adds && !removes && !updates) return `add ${adds} obstacles`;
+  if (adds && removes && !updates) return 'replace obstacles';
+  return `edit ${ops.length} obstacles`;
 }

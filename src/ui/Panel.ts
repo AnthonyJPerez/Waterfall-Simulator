@@ -307,21 +307,25 @@ export class Panel {
     }
   }
 
-  private flyToView(id: CameraView['id']) {
+  /** Camera views for the current scene (computed on demand: the terrain may have changed). */
+  cameraViews(): CameraView[] {
     const host = this.host;
-    if (!host) return;
+    if (!host) return [];
+    return computeCameraViews({
+      extent: host.world.domain,
+      presetCamera: host.preset.camera,
+      heightAt: (x, z) => host.modules.terrain.heightAt(x, z),
+      inflowZ: host.scene.inflows[0]?.z,
+      initialWater: host.preset.initialWater,
+      fovY: host.camera.fovY,
+      aspect: host.camera.aspect,
+    });
+  }
+
+  flyToView(id: CameraView['id']) {
     try {
-      const views = computeCameraViews({
-        extent: host.world.domain,
-        presetCamera: host.preset.camera,
-        heightAt: (x, z) => host.modules.terrain.heightAt(x, z),
-        inflowZ: host.scene.inflows[0]?.z,
-        initialWater: host.preset.initialWater,
-        fovY: host.camera.fovY,
-        aspect: host.camera.aspect,
-      });
-      const v = views.find((x) => x.id === id);
-      if (v) host.orbit.flyTo(v.position, v.target);
+      const v = this.cameraViews().find((x) => x.id === id);
+      if (v) this.host?.orbit.flyTo(v.position, v.target);
     } catch (e) {
       console.warn('[ui] camera view failed', e);
     }

@@ -79,7 +79,9 @@ describe('SceneHistory', () => {
     [...scene.obstacles].forEach((o) => scene.remove(o.id));
     tick();
     expect(h.undoDepth).toBe(2);
+    expect(h.undoLabel).toBe('remove 3 obstacles');
     h.undo();
+    expect(h.redoLabel).toBe('remove 3 obstacles');
     expect(scene.obstacles.map((o) => o.position[0])).toEqual([3, 2, 1]);
   });
 

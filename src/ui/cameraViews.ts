@@ -129,7 +129,8 @@ export function computeCameraViews(inp: CameraViewInput): CameraView[] {
 
   // Close-up on the lip: slightly downstream and to the side, looking back at the sheet as it parts.
   const lipT: V3 = [f.lipX + 0.01, f.lipY - Math.min(0.03, f.drop * 0.2), f.z];
-  views.push({ id: 'lip', label: 'Close-up on the lip', position: keepAbove(fromAngles(lipT, scale * 0.9, 0.55, 0.42), H, ext, 0.03), target: lipT });
+  const lipDist = clamp(f.drop * 1.5, 0.16, 0.5);
+  views.push({ id: 'lip', label: 'Close-up on the lip', position: keepAbove(fromAngles(lipT, lipDist, 0.55, 0.4), H, ext, 0.03), target: lipT });
 
   // Plunge pool: from downstream, above, looking at the impact zone.
   const poolT: V3 = [Math.max(f.lipX + 0.04, f.poolX - 0.03), Math.max(f.poolY, f.waterY - 0.02), f.z];
