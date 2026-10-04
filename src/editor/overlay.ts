@@ -389,23 +389,41 @@ export class OverlayRenderer {
     this.segBuf = device.createBuffer({ label: 'editor.overlay.segments', size: this.segData.byteLength, usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST });
   }
 
-  private ensureBindGroup(frame: FrameContext) {
+  /** 1×1 stand-ins (zero = "sky / nothing") used if the scene targets cannot be sampled as expected. */
+  private dummies?: { depth: GPUTexture; r32: GPUTexture; rgba: GPUTexture };
+
+  private usableTargets(frame: FrameContext) {
     const t = frame.targets;
-    const key = [t.depth, t.opaqueDepth, t.normal];
-    if (this.bindGroup && key.every((k, i) => k === this.bindKey[i])) return;
+    const ok = (tex: GPUTexture) => tex.sampleCount === 1 && (tex.usage & GPUTextureUsage.TEXTURE_BINDING) !== 0;
+    return ok(t.depth) && ok(t.opaqueDepth) && ok(t.normal) && t.opaqueDepth.format === 'r32float';
+  }
+
+  private ensureBindGroup(frame: FrameContext): [number, number] {
+    const t = frame.targets;
+    const usable = this.usableTargets(frame);
+    const key = [t.depth, t.opaqueDepth, t.normal, usable];
+    const size: [number, number] = usable ? [t.width, t.height] : [1, 1];
+    if (this.bindGroup && key.every((k, i) => k === this.bindKey[i])) return size;
     this.bindKey = key;
+    let views = { depth: t.depthView, opaque: t.opaqueDepthView, normal: t.normalView };
+    if (!usable) {
+      const tex = (format: GPUTextureFormat) => this.device.createTexture({ size: [1, 1], format, usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT });
+      this.dummies ??= { depth: tex('depth32float'), r32: tex('r32float'), rgba: tex('rgba16float') };
+      views = { depth: this.dummies.depth.createView(), opaque: this.dummies.r32.createView(), normal: this.dummies.rgba.createView() };
+    }
     this.bindGroup = this.device.createBindGroup({
       label: 'editor.overlay',
       layout: this.layout,
       entries: [
-        { binding: 0, resource: t.depthView },
-        { binding: 1, resource: t.opaqueDepthView },
-        { binding: 2, resource: t.normalView },
+        { binding: 0, resource: views.depth },
+        { binding: 1, resource: views.opaque },
+        { binding: 2, resource: views.normal },
         { binding: 3, resource: { buffer: this.uniform } },
         { binding: 4, resource: { buffer: this.shapeBuf } },
         { binding: 5, resource: { buffer: this.segBuf } },
       ],
     });
+    return size;
   }
 
   private writeShape(i: number, s: OverlayShape) {
@@ -456,9 +474,8 @@ export class OverlayRenderer {
     if (!nShapes && !nSeg) return;
     const w = Math.max(1, viewport[0]);
     const h = Math.max(1, viewport[1]);
-    const t = frame.targets;
-    this.ensureBindGroup(frame);
-    this.uniformData.set([w, h, 1 / w, 1 / h, t.width, t.height, t.width / w, t.height / h, frame.realTime % 3600, Math.max(0.5, Math.min(4, dpr || 1)), 0, 0]);
+    const [dw, dh] = this.ensureBindGroup(frame);
+    this.uniformData.set([w, h, 1 / w, 1 / h, dw, dh, dw / w, dh / h, frame.realTime % 3600, Math.max(0.5, Math.min(4, dpr || 1)), 0, 0]);
     this.device.queue.writeBuffer(this.uniform, 0, this.uniformData);
     [...hl.slice(0, nh), ...gh.slice(0, ng)].forEach((s, i) => this.writeShape(i, s));
     if (nShapes) this.device.queue.writeBuffer(this.shapeBuf, 0, this.shapeData, 0, nShapes * SHAPE_FLOATS);
@@ -491,5 +508,6 @@ export class OverlayRenderer {
     this.uniform.destroy();
     this.shapeBuf.destroy();
     this.segBuf.destroy();
+    if (this.dummies) Object.values(this.dummies).forEach((t) => t.destroy());
   }
 }
