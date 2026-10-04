@@ -649,6 +649,7 @@ export class ObstacleEditor implements EditorModule {
   };
 
   private escape() {
+    this.press = null;
     if (this.drag) this.endDrag(false);
     else if (this.selected !== null) this.deselect();
     else if (this.tool !== 'orbit') this.setTool('orbit');
@@ -901,8 +902,9 @@ export class ObstacleEditor implements EditorModule {
 
   private startDrag(p: Press) {
     const o = p.id !== undefined ? this.ctx.scene.get(p.id) : undefined;
-    if (!o) return;
+    if (!o || this.tool !== 'move') return;
     this.xformThrottle.flush();
+    this.selected = o.id;
     const start = poseOf(o);
     this.drag = {
       id: o.id,
@@ -1381,3 +1383,6 @@ export class ObstacleEditor implements EditorModule {
     this.overlay.destroy();
   }
 }
+
+/** @deprecated compatibility alias for registries that still import the scaffold's stub name. */
+export { ObstacleEditor as StubEditor };
