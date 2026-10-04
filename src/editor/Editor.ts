@@ -730,7 +730,8 @@ export class ObstacleEditor implements EditorModule {
   private resizeGhost(f: number) {
     const ed = this.ctx.params.values.editor;
     const s = clamp((Number.isFinite(ed.addSize) ? ed.addSize : 0.15) * f, ADD_SIZE_RANGE[0], ADD_SIZE_RANGE[1]);
-    this.ctx.params.set('editor.addSize', Math.round(s * 1000) / 1000);
+    // 0.1 mm resolution so small trackpad deltas never get stuck on rounding.
+    this.ctx.params.set('editor.addSize', Math.round(s * 10000) / 10000);
   }
 
   /** Places the current ghost. Returns the new obstacle (or null). */
