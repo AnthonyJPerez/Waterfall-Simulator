@@ -5,20 +5,107 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Creekside — Waterfall Simulator</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #0b0f0e; color: #dfe7e3; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
-      #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; }
-      #ui { position: fixed; top: 10px; right: 10px; width: 300px; max-height: calc(100vh - 20px); overflow-y: auto; z-index: 2; }
-      #hint { position: fixed; left: 12px; bottom: 10px; opacity: 0; transition: opacity 1s; color: #cfd8d4; text-shadow: 0 1px 2px #000; pointer-events: none; z-index: 2; }
-      #hint.show { opacity: 0.85; }
-      #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 2em; z-index: 3; }
+      :root {
+        --wf-glass: rgba(18, 24, 23, 0.8);
+        --wf-line: rgba(255, 255, 255, 0.09);
+        --wf-text: #dfe7e3;
+        --wf-dim: rgba(223, 231, 227, 0.62);
+        --wf-accent: #8fe3cf;
+        --wf-accent-bg: rgba(143, 227, 207, 0.16);
+      }
+      html, body { margin: 0; height: 100%; background: #0b0f0e; color: var(--wf-text); font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+      #view { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; touch-action: none; outline: none; }
+      #ui { position: fixed; top: 10px; right: 10px; width: min(300px, calc(100vw - 20px)); max-height: calc(100vh - 20px); overflow-y: auto; z-index: 3; scrollbar-width: thin; }
+      #hint { position: fixed; left: 12px; bottom: 10px; max-width: calc(100vw - 340px); opacity: 0; transition: opacity 1s; color: #cfd8d4; text-shadow: 0 1px 2px #000, 0 0 6px rgba(0,0,0,.6); pointer-events: none; z-index: 2; }
+      #hint.show { opacity: 0.9; }
+      #error { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 2em; z-index: 5; }
       #error p { max-width: 520px; font-size: 16px; }
-      body.noui #ui, body.noui #hint { display: none; }
+
+      /* Tool bar */
+      .wf-toolbar { position: fixed; top: 10px; left: 10px; right: 330px; display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; z-index: 2; user-select: none; pointer-events: none; }
+      .wf-toolbar > * { pointer-events: auto; }
+      .wf-group { display: flex; gap: 2px; padding: 3px; background: var(--wf-glass); border: 1px solid var(--wf-line); border-radius: 10px; backdrop-filter: blur(8px); box-shadow: 0 4px 18px rgba(0,0,0,.25); }
+      .wf-kinds { display: none; }
+      .wf-kinds.show { display: flex; }
+      .wf-btn { display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 9px; border: 0; border-radius: 7px; background: transparent; color: var(--wf-text); font: 500 12px system-ui, sans-serif; cursor: pointer; transition: background .12s, color .12s; }
+      .wf-btn:hover { background: rgba(255,255,255,.08); }
+      .wf-btn:focus-visible { outline: 2px solid var(--wf-accent); outline-offset: -2px; }
+      .wf-btn.on { background: var(--wf-accent-bg); color: var(--wf-accent); }
+      .wf-btn:disabled { opacity: .35; cursor: default; background: transparent; }
+      .wf-btn kbd { font: 600 10px ui-monospace, monospace; color: var(--wf-dim); border: 1px solid var(--wf-line); border-radius: 4px; padding: 0 4px; line-height: 15px; }
+      .wf-btn.on kbd { color: var(--wf-accent); border-color: rgba(143,227,207,.35); }
+
+      /* Help overlay */
+      .wf-help { position: fixed; inset: 0; z-index: 4; display: flex; align-items: center; justify-content: center; background: rgba(4, 8, 7, .5); backdrop-filter: blur(2px); padding: 16px; }
+      .wf-help[hidden] { display: none; }
+      .wf-help-card { max-width: 820px; width: 100%; max-height: calc(100vh - 32px); overflow-y: auto; background: var(--wf-glass); border: 1px solid var(--wf-line); border-radius: 14px; padding: 16px 20px 14px; box-shadow: 0 10px 40px rgba(0,0,0,.45); }
+      .wf-help-head { display: flex; align-items: center; justify-content: space-between; }
+      .wf-help h2 { margin: 0; font-size: 16px; font-weight: 600; }
+      .wf-help h3 { margin: 12px 0 6px; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--wf-accent); font-weight: 600; }
+      .wf-help-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); column-gap: 28px; }
+      .wf-help dl { display: grid; grid-template-columns: auto 1fr; gap: 4px 14px; margin: 0; }
+      .wf-help dt { font: 600 11.5px ui-monospace, monospace; color: #f2f6f4; white-space: nowrap; }
+      .wf-help dd { margin: 0; color: var(--wf-dim); }
+      .wf-help-foot { margin: 14px 0 0; color: var(--wf-dim); font-size: 12px; }
+      .wf-close { border: 0; background: transparent; color: var(--wf-text); font-size: 22px; line-height: 1; cursor: pointer; padding: 2px 6px; border-radius: 6px; }
+      .wf-close:hover { background: rgba(255,255,255,.08); }
+
+      /* Sound call-to-action */
+      .wf-sound { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); z-index: 2; display: inline-flex; align-items: center; gap: 8px; padding: 8px 14px; border-radius: 999px; border: 1px solid rgba(143,227,207,.35); background: var(--wf-glass); color: var(--wf-text); font: 13px system-ui, sans-serif; cursor: pointer; box-shadow: 0 4px 18px rgba(0,0,0,.3); animation: wf-breathe 2.8s ease-in-out infinite; }
+      .wf-sound b { color: var(--wf-accent); font-weight: 600; }
+      .wf-sound[hidden] { display: none; }
+      @keyframes wf-breathe { 50% { box-shadow: 0 4px 22px rgba(143,227,207,.25); } }
+
+      /* Stats HUD */
+      .wf-stats { position: fixed; left: 10px; top: 56px; margin: 0; z-index: 2; padding: 6px 9px; background: var(--wf-glass); border: 1px solid var(--wf-line); border-radius: 8px; font: 11px/1.45 ui-monospace, monospace; color: var(--wf-dim); pointer-events: none; white-space: pre; }
+      .wf-stats[hidden] { display: none; }
+
+      /* Control panel theme (Tweakpane v4 custom properties) */
+      #ui {
+        --tp-base-background-color: hsla(165, 12%, 8%, 0.84);
+        --tp-base-shadow-color: rgba(0, 0, 0, 0.3);
+        --tp-base-font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+        --tp-button-background-color: hsla(166, 45%, 72%, 0.16);
+        --tp-button-background-color-active: hsla(166, 50%, 76%, 0.34);
+        --tp-button-background-color-focus: hsla(166, 50%, 76%, 0.27);
+        --tp-button-background-color-hover: hsla(166, 50%, 76%, 0.23);
+        --tp-button-foreground-color: #dcf6ee;
+        --tp-container-background-color: hsla(160, 10%, 80%, 0.07);
+        --tp-container-background-color-active: hsla(160, 10%, 80%, 0.17);
+        --tp-container-background-color-focus: hsla(160, 10%, 80%, 0.13);
+        --tp-container-background-color-hover: hsla(160, 10%, 80%, 0.1);
+        --tp-container-foreground-color: #e3ebe7;
+        --tp-groove-foreground-color: hsla(160, 10%, 80%, 0.1);
+        --tp-input-background-color: hsla(160, 10%, 80%, 0.07);
+        --tp-input-background-color-active: hsla(160, 10%, 80%, 0.17);
+        --tp-input-background-color-focus: hsla(160, 10%, 80%, 0.13);
+        --tp-input-background-color-hover: hsla(160, 10%, 80%, 0.1);
+        --tp-input-foreground-color: #e8f0ec;
+        --tp-label-foreground-color: rgba(223, 231, 227, 0.66);
+        --tp-monitor-background-color: rgba(0, 0, 0, 0.22);
+        --tp-monitor-foreground-color: rgba(178, 236, 219, 0.9);
+      }
+      #ui .tp-rotv { backdrop-filter: blur(8px); border: 1px solid var(--wf-line); }
+
+      /* Panel extras */
+      .wf-preset-desc { padding: 2px 8px 6px; font-size: 11px; line-height: 1.4; color: rgba(220, 230, 226, .62); }
+
+      @media (max-width: 720px) {
+        .wf-label, .wf-btn kbd { display: none; }
+        .wf-toolbar { top: auto; bottom: 34px; left: 8px; right: 8px; justify-content: center; }
+        .wf-btn { padding: 0 8px; height: 36px; }
+        #hint { max-width: calc(100vw - 24px); font-size: 11px; }
+        .wf-sound { bottom: 92px; max-width: calc(100vw - 32px); }
+        .wf-stats { top: 10px; }
+      }
+
+      body.noui #ui, body.noui #hint, body.noui #wf-chrome, body.noui .wf-editor-label { display: none; }
     </style>
   </head>
   <body>
-    <canvas id="view"></canvas>
+    <canvas id="view" tabindex="0" aria-label="Creek simulation view"></canvas>
     <div id="ui"></div>
-    <div id="hint">Drag to orbit · right-drag to pan · wheel to zoom · click anywhere to enable sound</div>
+    <div id="hint">Drag to orbit · right-drag to pan · wheel to zoom · double-click to focus · 2 add rocks · 3 move · H help</div>
     <div id="error"><p></p></div>
     <script>
       if (new URLSearchParams(location.search).get('noui') === '1') document.body.classList.add('noui');

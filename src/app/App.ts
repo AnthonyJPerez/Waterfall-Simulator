@@ -85,7 +85,7 @@ export class App {
         loadPreset: (id) => this.loadPreset(id),
         enableAudio: () => this.enableAudio(),
         clearObstacles: () => [...this.scene.obstacles].forEach((o) => this.scene.remove(o.id)),
-      });
+      }, this);
     }
     window.addEventListener('resize', () => this.handleResize());
     this.handleResize();
