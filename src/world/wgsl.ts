@@ -43,6 +43,14 @@ const MAX_IMPACT_EVENTS: u32 = ${MAX_IMPACT_EVENTS}u;
 const STAT_TILES_X: u32 = ${STAT_TILES_X}u;
 const STAT_TILES_Z: u32 = ${STAT_TILES_Z}u;
 
+// Hand-off thresholds shared by the SWE and particle modules (hysteresis: detach > absorb).
+// Bed gradient magnitude (rise/run) above which SWE outflow is diverted to particles.
+const COUPLING_DETACH_SLOPE: f32 = 1.0;
+// Particles may only come to rest on / be absorbed into beds flatter than this gradient.
+const COUPLING_ABSORB_SLOPE: f32 = 0.6;
+// SWE depth (m) above which a particle entering the water column is absorbed.
+const COUPLING_ABSORB_MIN_DEPTH: f32 = 0.002;
+
 // Impact kinds
 const IMPACT_POOL: u32 = 0u;   // falling water entering standing/flowing water
 const IMPACT_SOLID: u32 = 1u;  // falling water striking rock / bed
