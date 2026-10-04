@@ -44,5 +44,8 @@ export function sendEditorCommand(target: EventTarget, cmd: EditorCommand) {
 /** While > 0 the editor draws no overlay (clean screenshots). */
 export const overlayControl = { suppressed: 0 };
 
+/** Size range (m) of new obstacles (params.editor.addSize). */
+export const ADD_SIZE_RANGE: [number, number] = [0.02, 0.5];
+
 export const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent || '');
 export const modKey = () => (isMac() ? '⌘' : 'Ctrl+');

@@ -62,7 +62,7 @@ import {
   type PlacedObstacle,
   type Variation,
 } from './placement';
-import { EDITOR_COMMAND_EVENT, EDITOR_STATUS_EVENT, isMac, modKey, overlayControl, type EditorCommand, type EditorStatus } from './protocol';
+import { ADD_SIZE_RANGE, EDITOR_COMMAND_EVENT, EDITOR_STATUS_EVENT, isMac, modKey, overlayControl, type EditorCommand, type EditorStatus } from './protocol';
 import { TrailingThrottle } from './throttle';
 
 export const EDITOR_TOOLS: EditorTool[] = ['orbit', 'add', 'move', 'delete'];
@@ -70,7 +70,6 @@ export const EDITOR_TOOLS: EditorTool[] = ['orbit', 'add', 'move', 'delete'];
 export const COMMIT_INTERVAL_MS = 50;
 const CLICK_SLOP_PX = 4;
 const DOUBLE_CLICK_MS = 350;
-export const ADD_SIZE_RANGE: [number, number] = [0.02, 0.5];
 const YAW_STEP = Math.PI / 12; // 15°
 const TILT_STEP = Math.PI / 24; // 7.5°
 const SCALE_STEP = 1.08;
@@ -342,6 +341,15 @@ export class ObstacleEditor implements EditorModule {
   private onPointerDown = (e: PointerEvent) => {
     if (this.destroyed) return;
     this.updatePointer(e, true);
+    // Keyboard shortcuts must work right after clicking into the view (e.g. after editing a
+    // panel field), so move focus away from any form control.
+    const active = document.activeElement as HTMLElement | null;
+    if (active && active !== this.canvas && active !== document.body) active.blur?.();
+    try {
+      this.canvas.focus({ preventScroll: true });
+    } catch {
+      /* not focusable */
+    }
     if (this.press || this.drag) {
       // A second finger / button while editing: keep it away from the orbit controller.
       if (e.pointerType === 'touch') this.consume(e);
