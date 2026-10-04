@@ -11,7 +11,7 @@ import { EnvRenderer } from '../render/env/EnvRenderer';
 import { StubWaterRenderer } from '../render/water/WaterRenderer';
 import { StubParticleRenderer } from '../render/particles/ParticleRenderer';
 import { StubAudioEngine } from '../audio/AudioEngine';
-import { StubEditor } from '../editor/Editor';
+import { ObstacleEditor } from '../editor/Editor';
 
 export interface HostContext {
   canvas: HTMLCanvasElement;
@@ -27,6 +27,6 @@ export function createModules(ctx: ModuleContext, host: HostContext): Modules {
   const water = new StubWaterRenderer(ctx);
   const particlesRenderer = new StubParticleRenderer(ctx, particles);
   const audio = new StubAudioEngine(ctx);
-  const editor = new StubEditor(ctx, host.canvas, host.camera, host.orbit, terrain);
+  const editor = new ObstacleEditor(ctx, host.canvas, host.camera, host.orbit, terrain);
   return { terrain, swe, particles, env, water, particlesRenderer, audio, editor };
 }
