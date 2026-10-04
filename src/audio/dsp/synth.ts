@@ -873,7 +873,7 @@ export function defineSynth() {
       } else this.gustEvt *= Math.exp(-dtB / 3.5);
       const wind = clamp(g[L.G_WIND], 0, 2);
       const g0 = this.gust;
-      const g1 = clamp((0.32 + 0.16 * this.gustX + this.gustEvt) * (0.4 + wind), 0.02, 2);
+      const g1 = clamp((0.34 + 0.15 * this.gustX + this.gustEvt) * (0.4 + wind), 0.1, 2);
       this.gust = g1;
       // Filters.
       const co = this.aCo;
@@ -893,8 +893,8 @@ export function defineSynth() {
       const tauS = 0.004;
       const envRms = Math.sqrt(rate * tauS * 0.5 * (1 / 3) + Math.pow(rate * tauS * 0.5, 2)) + 1e-9; // amp ~ U(0,1)
       const envNorm = 1 / envRms;
-      const leafLvl0 = 0.045 * g0;
-      const leafLvl1 = 0.045 * g1;
+      const leafLvl0 = 0.07 * g0;
+      const leafLvl1 = 0.07 * g1;
       const whLvl0 = 0.02 * g0 * g0;
       const whLvl1 = 0.02 * g1 * g1;
       const lowLvl0 = 0.03 * g0;

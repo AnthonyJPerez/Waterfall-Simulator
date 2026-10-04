@@ -94,8 +94,11 @@ export function dropEntrainmentProbability(D: number, v: number): number {
 
 /** Range [lo, hi] of the entrained bubble radius (m) for a drop of diameter D (m). */
 export function dropBubbleRadiusRange(D: number): [number, number] {
-  return [0.15 * D, 0.36 * D];
+  return [0.12 * D, 0.3 * D];
 }
+
+/** Largest drop diameter (m) that survives free fall (aerodynamic breakup of bigger parcels). */
+export const MAX_DROP_DIAMETER = 6.5e-3;
 
 /** Delay (s) between first contact and bubble pinch-off (crater collapse), grows with drop size. */
 export function dropBubbleDelay(D: number): number {

@@ -51,7 +51,7 @@ export interface ClusterOptions {
 }
 
 export const DEFAULT_CLUSTER_OPTIONS: ClusterOptions = {
-  angular: 0.3,
+  angular: 0.22,
   minRadius: 0.035,
   maxRadius: 0.8,
   hold: 0.8,
@@ -164,6 +164,7 @@ export class EmitterClusterer {
         if (slot >= 0) {
           this.spawn(slot, p);
           best = slot;
+          bestRatio = 0;
         }
       }
       if (best < 0) {
@@ -171,7 +172,10 @@ export class EmitterClusterer {
         continue;
       }
       assign[i] = best;
-      const w = Math.max(p.w, 1e-12);
+      // Points force-assigned beyond the merge radius (all emitters busy) are routed to the emitter but
+      // barely move its position.
+      const forced = Math.max(1, bestRatio);
+      const w = Math.max(p.w, 1e-12) / (forced * forced * forced * forced);
       const o = best * 6;
       acc[o] += w * p.x;
       acc[o + 1] += w * p.y;

@@ -28,6 +28,7 @@ import {
   dropEntrainmentProbability,
   equivalentDiameter,
   makeRng,
+  MAX_DROP_DIAMETER,
   meanBubbleVolume,
   minnaertFrequency,
   plungingAirRatio,
@@ -51,7 +52,7 @@ export const TUNING = {
   // --- distance model
   refDistance: 0.5,
   minDistance: 0.07,
-  maxGain: 3.0,
+  maxGain: 2.5,
   airRefDistance: 0.6,
   airMinCutoff: 2500,
   reverbSend: 0.55,
@@ -60,25 +61,25 @@ export const TUNING = {
   kDrop: 0.15,
   kSecondary: 0.07,
   kJet: 0.02,
-  kBabble: 0.022,
+  kBabble: 0.015,
   kJump: 0.05,
   kTransient: 0.035,
   kSplat: 0.05,
   // --- populations
   /** Babble bubbles per second per (turbulence × wetted m² × m/s). */
-  babbleRate: 25000,
+  babbleRate: 15000,
   /** Jump gurgles per second per (jump intensity × m²). */
   jumpRate: 400,
   /** Rush rms per sqrt(m² · (m/s)³). */
   rushK: 0.05,
   /** Rumble rms per sqrt(W) of plunging kinetic power. */
-  rumbleK: 0.02,
+  rumbleK: 0.015,
   /** Splash hiss rms per sqrt(W) of plunging kinetic power (× (v/3 m/s)). */
   plungeHissK: 0.012,
   // --- dense / sparse classification of impact bins (volume flux, m³/s per bin)
   binSize: 0.06,
-  densePool: [0.03e-3, 0.3e-3],
-  denseSolid: [0.03e-3, 0.3e-3],
+  densePool: [0.02e-3, 0.15e-3],
+  denseSolid: [0.02e-3, 0.15e-3],
   denseDrop: [0.005e-3, 0.06e-3],
   fluxTau: 0.15,
   // --- budgets (individual voices started per real second)
@@ -86,7 +87,7 @@ export const TUNING = {
   burstBudget: 1400,
   discreteShare: 0.6,
   // --- spectra
-  hissBrightness: 13000,
+  hissBrightness: 9000,
 };
 
 export interface ListenerPose {
@@ -645,7 +646,7 @@ export class AudioMapper {
       for (let k = 0; k < 3; k++) {
         if (b.n[k] <= 0) continue;
         const v = b.volV[k] / b.vol[k];
-        const D = equivalentDiameter(b.vol[k] / b.n[k]);
+        const D = Math.min(equivalentDiameter(b.vol[k] / b.n[k]), MAX_DROP_DIAMETER);
         if (k === IMPACT_SOLID) P += (b.n[k] / simDt) * AudioMapper.splatEnergy(D, v);
         else P += (b.n[k] / simDt) * AudioMapper.dropEventEnergy(D, v, k);
         if (k === IMPACT_POOL) P += TUNING.rumbleK ** 2 * 0.5 * WATER_DENSITY * (b.volV2[k] / simDt);
@@ -803,7 +804,7 @@ export class AudioMapper {
   /** One sparse drop / small parcel entering water: impact transient + (maybe) a ringing bubble + secondaries. */
   private drop(e: number, g: number, kind: number, vol: number, v: number, t0: number, p: number, nyqF: number, secondaries: boolean) {
     const T = TUNING;
-    const D = clamp(equivalentDiameter(vol), 0.3e-3, kind === IMPACT_DROP ? 4e-3 : 12e-3);
+    const D = clamp(equivalentDiameter(vol), 0.3e-3, kind === IMPACT_DROP ? 4e-3 : MAX_DROP_DIAMETER);
     const vv = Math.max(v, 0.05);
     // Impact transient (initial contact): short broadband click, brighter for small drops.
     const at = T.kTransient * Math.pow(D / 5e-3, 0.8) * Math.pow(vv / 2.5, 1.5) * this.sampleUniform(0.6, 1.3) * (kind === IMPACT_DROP ? 0.6 : 1);
@@ -944,10 +945,11 @@ export class AudioMapper {
           this.diag.bubbles[BUBBLE_KIND.jet]++;
           this.diag.individualPower += ((A * A) / (4 * d * p) / Math.max(simDt, 1e-4)) * this.rateScale;
         }
-        // Lumped part: bubbles smaller than rs (above Nyquist excluded).
+        // Lumped part: bubbles smaller than rs (above Nyquist excluded). Its power spectral density peaks
+        // just above f(rs) and falls steeply (GLF population × damping), hence the band-pass layer.
         const Ecum = this.jetEnergyTable.at(rs) - this.jetEnergyTable.at(rNyq);
         const Pl = jetLambda * T.kJet * T.kJet * 1.0833 * Math.max(0, Ecum) * powerScale;
-        this.addNoise(e, 'hiss', Pl, clamp(minnaertFrequency(rs) * p, 400, 9000));
+        this.addNoise(e, 'mid', Pl, clamp(1.3 * minnaertFrequency(rs) * p, 400, 9000));
         this.diag.lumpedPower += Pl;
       }
       // Low rumble (bubble-cloud collective oscillation + impact pressure) and splash hiss.
